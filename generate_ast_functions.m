@@ -3,7 +3,7 @@
 % log of the density function
 syms y alpha nu1 nu2 mu sigma;
 
-z = (y - mu) ./ ( 2 .* sigma);
+z = (y - mu) ./ (2 .* sigma);
 
 K = @(nu) gamma(0.5 .* (nu + 1)) ./ (sqrt(pi .* nu) .* gamma(0.5 .* nu));
 
