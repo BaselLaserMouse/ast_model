@@ -12,10 +12,12 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
     prior_mean = zeros(1, D);
     prior_log_std = ones(1, D);
 
-    function [v_elbo, g_elbo] = elbo_n_grad(params)
+    function [v_elbo, g_elbo] = elbo_n_grad(params, t)
+        rng(t);
+
         % sampling from approximate posterior
-        post_mean = params(1, 1:D);
-        post_log_std = params(1, D+1:end);
+        post_mean = params(1:D)';
+        post_log_std = params(D+1:end)';
         rvs = randn(n_samples, D);
         x = rvs .* exp(post_log_std) + post_mean;
 
@@ -48,17 +50,25 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
         g_sigma = sum(sum(g_sigmas ./ sqrt(n), 3), 2);
         g_x = [g_coeff, g_mu(:, :), g_offset, g_sigma] .* x_exp;
 
-        g_params = [sum(g_x, 1), sum(g_x .* rvs, 1) .* exp(post_log_std)];
+        g_params = [mean(g_x, 1), mean(g_x .* rvs, 1) .* exp(post_log_std)];
         g_kl = kl_gauss_grad(post_mean, post_log_std, prior_mean, prior_log_std);
         g_elbo = g_params - g_kl;
     end
 
-    % TODO initial parameters
+    % initial parameters
     init_mean = -1 * ones(1, D);
     init_log_std = -5 * ones(1, D);
     init_params = cat(2, init_mean, init_log_std);
 
-    % TODO stochastic gradient descent
+    %  stochastic gradient descent
+    var_params = fmin_adam(@elbo_n_grad, init_params');
+    post_mean = var_params(1:D)';
+    post_log_std = var_params(D:end)';
+
+    coeff = exp(post_mean(1));
+    mu = exp(post_mean(2:1+nt))';
+    offset = exp(post_mean(2+nt:3+nt))';
+    sigma = exp(post_mean(end));
 
     % TODO apply correction
 end
@@ -71,4 +81,7 @@ end
 
 function x = kl_gauss_grad(mean1, log_std1, mean2, log_std2)
     % gradient of KL divergence between to normal distribution, wrt. 2nd one
+    grad_mean1 = exp(-2 .* log_std2) .* (mean1 - mean2);
+    grad_log_std1 = exp(2 .* log_std1) .* exp(-2 .* log_std2) - 1;
+    x = cat(2, grad_mean1, grad_log_std1);
 end
