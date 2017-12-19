@@ -13,7 +13,7 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
         [logp, g_x] = logpdf_n_grad(traces, n_sectors, params);
     end
 
-    n_params = 4 + size(traces, 2);
+    n_params = size(traces, 2) + 4;
     prior_mean = zeros(1, n_params);
     prior_log_std = ones(1, n_params);
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);

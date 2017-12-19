@@ -1,8 +1,11 @@
 function elbo_optim_fn = make_elbo(logpdf_n_grad, prior_mean, prior_log_std, n_samples)
 
     function [v_elbo, g_elbo] = elbo_n_grad(params, t)
-        % sampling from approximate posterior
-        D = numel(params) / 2;
+        % TODO remove if not needed by adam implementation
+        rng(t);
+
+        % sampling from approximate posteriorv
+        D = numel(prior_mean);
         post_mean = params(1:D)';
         post_log_std = params(D+1:end)';
         rvs = randn(n_samples, D);
