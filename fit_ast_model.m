@@ -24,17 +24,10 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
 
         % unpack parameters samples
         x_exp = exp(x);
-        coeff = x_exp(:, 1);  % TODO use normal cdf instead of exp
+        coeff = normcdf(x(:, 1));
         mu = reshape(x_exp(:, 2:1+nt), [], 1, nt);
         offset = x_exp(:, 2+nt:3+nt);
         sigma = x_exp(:, end);
-
-        disp(exp(post_mean(1)))
-        cla();
-        hold('on');
-        plot(squeeze(y(1, 2, :)));
-        plot(squeeze(y(1, 2, :)) - exp(params(2:1+nt)));
-        pause(0.01)
 
         coeffs = cat(2, coeff, ones(n_samples, 1));
         mus = coeffs .* mu + offset;
@@ -53,7 +46,9 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
         g_mu = sum(g_mus .* coeffs, 2);
         g_offset = sum(g_mus, 3);
         g_sigma = sum(sum(g_sigmas ./ sqrt(n), 3), 2);
-        g_x = [g_coeff, g_mu(:, :), g_offset, g_sigma] .* x_exp;
+        g_x = [g_coeff, g_mu(:, :), g_offset, g_sigma];
+        g_x(:, 1) = g_x(:, 1) .* exp(0.5 * -x(:, 1).^2) ./ sqrt(2 .* pi);
+        g_x(:, 2:end) = g_x(:, 2:end) .* x_exp(:, 2:end);
 
         g_params = [mean(g_x, 1), mean(g_x .* rvs, 1) .* exp(post_log_std)];
         [g_post_mean, g_post_log_std] = ...
@@ -64,15 +59,25 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
         % inverse signs to make it a minimization problem
         v_elbo = -v_elbo;
         g_elbo = -g_elbo;
+
+        % display some feedback
+        disp(normcdf(post_mean(1)))
+        cla();
+        hold('on');
+        plot(squeeze(y(1, 2, :)));
+        plot(squeeze(y(1, 2, :)) - exp(params(2:1+nt)));
+        pause(0.01)
     end
 
-    % initial parameters
+    % initial parameters (coeff, mu, offset, sigma)
+%     init_mu = log(squeeze(y(1, 2, :)) - min(y(1, 2, :)) + 1e-6)';
+%     init_mean = [log(0.7), init_mu, log(min(y, [], 3)), log(1)];
     init_mean = -1 * ones(1, D);
     init_log_std = -5 * ones(1, D);
     init_params = cat(2, init_mean, init_log_std);
 
     %  stochastic gradient descent
-    var_params = fmin_adam(@elbo_n_grad, init_params');
+    var_params = fmin_adam(@elbo_n_grad, init_params', 1e-2);
     post_mean = var_params(1:D)';
     post_log_std = var_params(D:end)';
 
