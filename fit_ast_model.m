@@ -9,9 +9,6 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
     nt = size(traces, 2);
     D = 4 + nt;
 
-    y = reshape(traces, 1, 2, []);
-    n = reshape(n_sectors, 1, 2);
-
     prior_mean = zeros(1, D);
     prior_log_std = ones(1, D);
 
@@ -31,6 +28,9 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
     end
 
     function [logp, g_x] = logpdf_n_grad(x)
+        y = reshape(traces, 1, 2, []);
+        n = reshape(n_sectors, 1, 2);
+
         [coeff, mu, offset, sigma] = transform_params(x);
         mu = reshape(mu, [], 1, nt);
 
