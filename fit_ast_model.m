@@ -2,7 +2,7 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
     % TODO documentation
     % TODO input checks
 
-    n_samples = 10;
+    n_samples = 5;
     nt = size(y, 2);
     D = 4 + nt;
 
@@ -13,6 +13,7 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
     prior_log_std = ones(1, D);
 
     function [v_elbo, g_elbo] = elbo_n_grad(params, t)
+        % fix random seed to get reproducible gradients
         rng(t);
 
         % sampling from approximate posterior
@@ -23,15 +24,17 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
 
         % unpack parameters samples
         x_exp = exp(x);
-        coeff = x_exp(:, 1);
+        coeff = x_exp(:, 1);  % TODO use normal cdf instead of exp
         mu = reshape(x_exp(:, 2:1+nt), [], 1, nt);
         offset = x_exp(:, 2+nt:3+nt);
         sigma = x_exp(:, end);
 
         disp(exp(post_mean(1)))
         cla();
-        plot(squeeze(mean(mu, 1)));
-        pause(0.1)
+        hold('on');
+        plot(squeeze(y(1, 2, :)));
+        plot(squeeze(y(1, 2, :)) - exp(params(2:1+nt)));
+        pause(0.01)
 
         coeffs = cat(2, coeff, ones(n_samples, 1));
         mus = coeffs .* mu + offset;
@@ -70,15 +73,6 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
 
     %  stochastic gradient descent
     var_params = fmin_adam(@elbo_n_grad, init_params');
-%     var_params = init_params';
-%     for ii = 1:10000
-%         [v_elbo, g_elbo] = elbo_n_grad(var_params, ii);
-%         fprintf('%d:  %f\n', ii, v_elbo);
-%         var_params = var_params - g_elbo' * 1e-4;
-% %         cla();
-% %         plot(exp(var_params(2:1+nt)));
-% %         pause(0.1)
-%     end
     post_mean = var_params(1:D)';
     post_log_std = var_params(D:end)';
 
