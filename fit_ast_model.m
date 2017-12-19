@@ -57,6 +57,33 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
 
     v_elbos = nan(1, 10000);
 
+    function callback(params, t)
+        if rem(t, 100) ~= 0
+            return;
+        end
+
+        [coeff, mu, offset] = transform_params(params(1:D)');
+        fprintf('iteration %d, coeff %f\n', t, coeff);
+
+        subplot(3, 1, 1)
+        cla();
+        plot(v_elbos);
+
+        subplot(3, 1, 2)
+        cla()
+        hold('on');
+        plot(traces(2, :));
+        plot(traces(2, :) - mu - offset(2));
+
+        subplot(3, 1, 3)
+        cla()
+        hold('on');
+        plot(traces(1, :));
+        plot(traces(1, :) - mu * coeff - offset(1));
+
+        pause(0.01)
+    end
+
     function [v_elbo, g_elbo] = elbo_n_grad(params, t)
         % fix random seed to get reproducible gradients
         rng(t);
@@ -85,28 +112,7 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
 
         % display some feedback
         v_elbos(t) = -v_elbo;
-        if rem(t, 100) == 0
-            [coeff, mu, offset] = transform_params(post_mean);
-            fprintf('iteration %d, coeff %f\n', t, coeff);
-
-            subplot(3, 1, 1)
-            cla();
-            plot(v_elbos);
-
-            subplot(3, 1, 2)
-            cla()
-            hold('on');
-            plot(traces(2, :));
-            plot(traces(2, :) - mu - offset(2));
-
-            subplot(3, 1, 3)
-            cla()
-            hold('on');
-            plot(traces(1, :));
-            plot(traces(1, :) - mu * coeff - offset(1));
-
-            pause(0.01)
-        end
+        callback(params, t);
     end
 
     % initial parameters (coeff, mu, offset, sigma)
