@@ -6,57 +6,31 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
         n_samples = 1;
     end
 
-    D = 4 + size(traces, 2);
-    v_elbos = nan(1, 10000);
-
-    function callback(params, t)
-        if rem(t, 100) ~= 0
-            return;
-        end
-
-        [coeff, mu, offset] = transform_params(params(1:D)');
-        fprintf('iteration %d, coeff %f\n', t, coeff);
-
-        subplot(3, 1, 1)
-        cla();
-        plot(v_elbos);
-
-        subplot(3, 1, 2)
-        cla()
-        hold('on');
-        plot(traces(2, :));
-        plot(traces(2, :) - mu - offset(2));
-
-        subplot(3, 1, 3)
-        cla()
-        hold('on');
-        plot(traces(1, :));
-        plot(traces(1, :) - mu * coeff - offset(1));
-
-        pause(0.01)
-    end
+    % fix random seed to get reproducible gradients
+    rng(12345);
 
     function [logp, g_x] = logpdf_fn(params, ~)
         [logp, g_x] = logpdf_n_grad(traces, n_sectors, params);
     end
 
+    D = 4 + size(traces, 2);
     prior_mean = zeros(1, D);
     prior_log_std = ones(1, D);
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
+    v_elbos = nan(1, 10000);
 
     function [val, g] = optim_fn(params, t)
         [val, g] = elbo_fn(params, t);
         v_elbos(t) = -val;
-        callback(params, t);
+        if rem(t, 100) == 0
+            plot_traces(traces, params, v_elbos, t);
+        end
     end
 
     % initial parameters
     init_mean = -1 * ones(1, D);
     init_log_std = -5 * ones(1, D);
     init_params = cat(2, init_mean, init_log_std);
-
-    % fix random seed to get reproducible gradients
-    rng(12345);
 
     %  stochastic gradient descent
     var_params = fmin_adam(@optim_fn, init_params', 1e-2);
@@ -109,4 +83,28 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
     g_x = [g_coeff, g_mu(:, :), g_offset, g_sigma];
     g_x(:, 1) = g_x(:, 1) .* exp(0.5 * -x(:, 1).^2) ./ sqrt(2 .* pi);
     g_x(:, 2:end) = g_x(:, 2:end) .* exp(x(:, 2:end));
+end
+
+function plot_traces(traces, params, v_elbos, t)
+    D = numel(params) / 2;
+    [coeff, mu, offset] = transform_params(params(1:D)');
+    fprintf('iteration %d, coeff %f\n', t, coeff);
+
+    subplot(3, 1, 1)
+    cla();
+    plot(v_elbos);
+
+    subplot(3, 1, 2)
+    cla()
+    hold('on');
+    plot(traces(2, :));
+    plot(traces(2, :) - mu - offset(2));
+
+    subplot(3, 1, 3)
+    cla()
+    hold('on');
+    plot(traces(1, :));
+    plot(traces(1, :) - mu * coeff - offset(1));
+
+    pause(1e-5)
 end
