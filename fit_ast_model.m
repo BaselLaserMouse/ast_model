@@ -12,6 +12,8 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
     prior_mean = zeros(1, D);
     prior_log_std = ones(1, D);
 
+    v_elbos = nan(1, 10000);
+
     function [v_elbo, g_elbo] = elbo_n_grad(params, t)
         % fix random seed to get reproducible gradients
         rng(t);
@@ -61,12 +63,24 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
         g_elbo = -g_elbo;
 
         % display some feedback
-        disp(normcdf(post_mean(1)))
-        cla();
-        hold('on');
-        plot(squeeze(y(1, 2, :)));
-        plot(squeeze(y(1, 2, :)) - exp(params(2:1+nt)));
-        pause(0.01)
+        v_elbos(t) = -v_elbo;
+        if rem(t, 100) == 0
+            fprintf('iteration %d, coeff %f\n', t, normcdf(post_mean(1)));
+            subplot(3, 1, 1)
+            cla();
+            plot(v_elbos);
+            subplot(3, 1, 2)
+            cla()
+            hold('on');
+            plot(squeeze(y(1, 2, :)));
+            plot(squeeze(y(1, 2, :)) - exp(params(2:1+nt)) - exp(params(3+nt)));
+            subplot(3, 1, 3)
+            cla()
+            hold('on');
+            plot(squeeze(y(1, 1, :)));
+            plot(squeeze(y(1, 1, :)) - exp(params(2:1+nt)) .* normcdf(params(1)) - exp(params(2+nt)));
+            pause(0.01)
+        end
     end
 
     % initial parameters (coeff, mu, offset, sigma)
@@ -81,7 +95,7 @@ function [coeff, mu, offset, sigma] = fit_ast_model(y, n)
     post_mean = var_params(1:D)';
     post_log_std = var_params(D:end)';
 
-    coeff = exp(post_mean(1));
+    coeff = normcdf(post_mean(1));
     mu = exp(post_mean(2:1+nt))';
     offset = exp(post_mean(2+nt:3+nt))';
     sigma = exp(post_mean(end));
