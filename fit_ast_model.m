@@ -13,9 +13,9 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
         [logp, g_x] = logpdf_n_grad(traces, n_sectors, params);
     end
 
-    D = 4 + size(traces, 2);
-    prior_mean = zeros(1, D);
-    prior_log_std = ones(1, D);
+    n_params = 4 + size(traces, 2);
+    prior_mean = zeros(1, n_params);
+    prior_log_std = ones(1, n_params);
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
     v_elbos = nan(1, 10000);
 
@@ -24,18 +24,19 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
         v_elbos(t) = -val;
         if rem(t, 100) == 0
             plot_traces(traces, params, v_elbos, t);
+            pause(0.01);
         end
     end
 
     % initial parameters
-    init_mean = -1 * ones(1, D);
-    init_log_std = -5 * ones(1, D);
+    init_mean = -1 * ones(1, n_params);
+    init_log_std = -5 * ones(1, n_params);
     init_params = cat(2, init_mean, init_log_std);
 
     %  stochastic gradient descent
     var_params = fmin_adam(@optim_fn, init_params', 1e-2);
-    post_mean = var_params(1:D)';
-    post_log_std = var_params(D:end)';
+    post_mean = var_params(1:n_params)';
+    post_log_std = var_params(n_params:end)';
     [coeff, mu, offset, sigma] = transform_params(post_mean);
 
     % TODO apply correction
@@ -98,13 +99,11 @@ function plot_traces(traces, params, v_elbos, t)
     cla()
     hold('on');
     plot(traces(2, :));
-    plot(traces(2, :) - mu - offset(2));
+    plot(traces(2, :) - mu);
 
     subplot(3, 1, 3)
     cla()
     hold('on');
     plot(traces(1, :));
-    plot(traces(1, :) - mu * coeff - offset(1));
-
-    pause(1e-5)
+    plot(traces(1, :) - mu * coeff);
 end
