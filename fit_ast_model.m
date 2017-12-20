@@ -22,7 +22,7 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
 
     %  stochastic gradient descent
     init_params = [-1 * ones(1, n_params), -5 * ones(1, n_params)];
-    adam = AdamOptimizer(init_params);
+    adam = AdamOptimizer(init_params, 'step_size', 1e-2);
     v_elbos = nan(1, maxiter);
 
     for ii = 1:maxiter
