@@ -1,4 +1,5 @@
 function elbo_optim_fn = make_elbo(logpdf_n_grad, prior_mean, prior_log_std, n_samples)
+    % create an ELBO cost function for a model, returning value and gradient
 
     function [v_elbo, g_elbo] = elbo_n_grad(params, t)
         % sampling from approximate posterior
@@ -31,7 +32,7 @@ function x = kl_gauss(mean1, log_std1, mean2, log_std2)
 end
 
 function [g_mean1, g_log_std1] = kl_gauss_grad(mean1, log_std1, mean2, log_std2)
-    % gradient of KL divergence between to normal distribution, wrt. 2nd one
+    % gradient of KL divergence between to normal distributions, wrt. 1st one
     g_mean1 = exp(-2 .* log_std2) .* (mean1 - mean2);
     g_log_std1 = exp(2 .* log_std1) .* exp(-2 .* log_std2) - 1;
 end

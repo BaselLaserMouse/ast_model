@@ -15,11 +15,11 @@ right_branch = ...
     -log(sigma) ...
     - 0.5 .* (nu2 + 1) .* log(1 + (z ./ ((1 - alpha) .* K(nu2))).^2 ./ nu2);
 
-% generate function file
+% generate function files
 matlabFunction(left_branch, 'File', 'ast_logpdf_left', 'Outputs', {'x'});
 matlabFunction(right_branch, 'File', 'ast_logpdf_right', 'Outputs', {'x'});
 
-% generate file for the gradient wrt. mu and sigma
+% generate files for the gradient wrt. mu and sigma
 matlabFunction(jacobian(left_branch, mu), ...
                'File', 'ast_logpdf_left_grad_mu', 'Outputs', {'x'});
 matlabFunction(jacobian(right_branch, mu), ...
