@@ -2,6 +2,9 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
     % TODO documentation
     % TODO input checks
 
+    % TODO meaningful priors
+    % TODO meaningful initial values
+
     maxiter = 10000;
 
     if ~exist('n_samples', 'var')
@@ -14,7 +17,11 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
 
     n_params = size(traces, 2) + 4;
     prior_mean = zeros(1, n_params);
-    prior_log_std = ones(1, n_params);
+    prior_log_std = zeros(1, n_params);
+%     prior_mean(1) = 1;
+%     prior_log_std(1) = -log(3);
+%     prior_mean(end) = 0.5 * log(n_sectors(1));
+%     prior_log_std(end) = -2;
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
 
     % fixed seed for reproducibility
@@ -38,8 +45,9 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
 
     % unpack results
     post_mean = adam.x(1:n_params)';
-    post_log_std = adam.x(n_params:end)';
-    [coeff, mu, offset, sigma] = transform_params(post_mean);
+    post_log_std = adam.x(n_params+1:end)';
+    x = randn(2000, n_params) .* exp(post_log_std) + post_mean;
+    [coeff, mu, offset, sigma] = transform_params(x);
 
     % TODO apply correction
 end
@@ -93,7 +101,7 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
 end
 
 function plot_traces(traces, params, v_elbos, t)
-    % utiliy function to display results of ongoing optimization
+    % utility function to display results of ongoing optimization
 
     D = numel(params) / 2;
     [coeff, mu] = transform_params(params(1:D)');
