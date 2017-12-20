@@ -2,47 +2,50 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
     % TODO documentation
     % TODO input checks
 
+    maxiter = 10000;
+
     if ~exist('n_samples', 'var')
         n_samples = 1;
     end
 
-    % fix random seed to get reproducible gradients
-    rng(12345);
-
-    function [logp, g_x] = logpdf_fn(params, ~)
-        [logp, g_x] = logpdf_n_grad(traces, n_sectors, params);
+    function [logp, g_params] = logpdf_fn(params, ~)
+        [logp, g_params] = logpdf_n_grad(traces, n_sectors, params);
     end
 
     n_params = size(traces, 2) + 4;
     prior_mean = zeros(1, n_params);
     prior_log_std = ones(1, n_params);
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
-    v_elbos = nan(1, 10000);
 
-    function [val, g] = optim_fn(params, t)
-        [val, g] = elbo_fn(params, t);
-        v_elbos(t) = -val;
-        if rem(t, 100) == 0
-            plot_traces(traces, params, v_elbos, t);
+    % fixed seed for reproducibility
+    rng(12345);
+
+    %  stochastic gradient descent
+    init_params = [-1 * ones(1, n_params), -5 * ones(1, n_params)];
+    adam = AdamOptimizer(init_params);
+    v_elbos = nan(1, maxiter);
+
+    for ii = 1:maxiter
+        [v_elbo, g_elbo] = elbo_fn(adam.x, ii);
+        adam.step(-g_elbo);
+
+        v_elbos(ii) = v_elbo;
+        if rem(ii, 100) == 0
+            plot_traces(traces, adam.x, v_elbos, ii);
             pause(0.01);
         end
     end
 
-    % initial parameters
-    init_mean = -1 * ones(1, n_params);
-    init_log_std = -5 * ones(1, n_params);
-    init_params = cat(2, init_mean, init_log_std);
-
-    %  stochastic gradient descent
-    var_params = fmin_adam(@optim_fn, init_params', 1e-2);
-    post_mean = var_params(1:n_params)';
-    post_log_std = var_params(n_params:end)';
+    % unpack results
+    post_mean = adam.x(1:n_params)';
+    post_log_std = adam.x(n_params:end)';
     [coeff, mu, offset, sigma] = transform_params(post_mean);
 
     % TODO apply correction
 end
 
 function [coeff, mu, offset, sigma] = split_params(params)
+    % helper function to unpack parameters
     coeff = params(:, 1);
     mu = params(:, 2:end-3);
     offset = params(:, end-2:end-1);
@@ -50,6 +53,7 @@ function [coeff, mu, offset, sigma] = split_params(params)
 end
 
 function [coeff, mu, offset, sigma] = transform_params(params)
+    % helper function to unpack and transform parameters
     [coeff, mu, offset, sigma] = split_params(params);
     coeff = normcdf(coeff);
     mu = exp(mu);
@@ -58,6 +62,8 @@ function [coeff, mu, offset, sigma] = transform_params(params)
 end
 
 function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
+    % evaluate log-density of AST model and its gradient wrt. mu and sigma
+
     nt = size(traces, 2);
     y = reshape(traces, 1, 2, []);
     n = reshape(n_sectors, 1, 2);
@@ -87,8 +93,10 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
 end
 
 function plot_traces(traces, params, v_elbos, t)
+    % utiliy function to display results of ongoing optimization
+
     D = numel(params) / 2;
-    [coeff, mu, offset] = transform_params(params(1:D)');
+    [coeff, mu] = transform_params(params(1:D)');
     fprintf('iteration %d, coeff %f\n', t, coeff);
 
     subplot(3, 1, 1)
