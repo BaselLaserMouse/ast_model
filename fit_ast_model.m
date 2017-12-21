@@ -33,6 +33,10 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     maxiter = parser.Results.maxiter;
     verbose = parser.Results.verbose;
 
+    % rescale traces to correspond to prior assumptions
+    scale = std(traces(:));
+    traces = traces / scale;
+
     % create likelihood of the model and corresponding ELBO cost function
     function [logp, g_params] = logpdf_fn(params, ~)
         [logp, g_params] = logpdf_n_grad(traces, n_sectors, params);
@@ -72,7 +76,7 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     var_params = adam.x';
     post_mean = var_params(1:n_params);
     [coeff, mu] = transform_params(post_mean);
-    cleaned_trace = traces(1, :) - coeff * mu;
+    cleaned_trace = (traces(1, :) - coeff * mu) * scale;
 end
 
 function [coeff, mu, offset, sigma] = split_params(params)
