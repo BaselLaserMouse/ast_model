@@ -1,7 +1,7 @@
 function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
     % TODO documentation
 
-    % TODO meaningful priors
+    % TODO meaningful priors (mu_mean == 1 ?, informed prior for coeff?)
     % TODO meaningful initial values
 
     if ~exist('traces', 'var')
