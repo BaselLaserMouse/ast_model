@@ -23,8 +23,10 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'n_samples'));
     parser.addParameter('maxiter', 10000, ...
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'maxiter'));
+    verbose_class = {'logical', 'numeric'};
+    verbose_attr = {'scalar', 'integer', 'nonnegative'};
     parser.addParameter('verbose', false, ...
-        @(x) validateattributes(x, {'logical'}, {'scalar'}, '', 'display'));
+        @(x) validateattributes(x, verbose_class, verbose_attr, '', 'verbose'));
 
     parser.parse(varargin{:});
     n_samples = parser.Results.n_samples;
@@ -39,10 +41,6 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     n_params = size(traces, 2) + 4;
     prior_mean = zeros(1, n_params);
     prior_log_std = zeros(1, n_params);
-%     prior_mean(1) = 1;
-%     prior_log_std(1) = -log(3);
-%     prior_mean(end) = 0.5 * log(n_sectors(1));
-%     prior_log_std(end) = -2;
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
 
     % fixed seed for reproducibility
@@ -55,12 +53,18 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
 
     for ii = 1:maxiter
         [v_elbo, g_elbo] = elbo_fn(adam.x, ii);
+        v_elbos(ii) = v_elbo;
         adam.step(-g_elbo);
 
-        v_elbos(ii) = v_elbo;
+        % display extra information
         if verbose && rem(ii, 100) == 0
-            plot_traces(traces, adam.x, v_elbos, ii);
-            pause(0.01);
+            [coeff, mu] = transform_params(adam.x(1:n_params)');
+            fprintf('iteration %d, elbo %f, coeff %f\n', ii, v_elbo, coeff);
+
+            if verbose > 1
+                plot_traces(traces, coeff, mu, v_elbos);
+                pause(0.01);
+            end
         end
     end
 
@@ -117,26 +121,25 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
     g_x(:, end) = g_x(:, end) .* exp(x(:, end));
 end
 
-function plot_traces(traces, params, v_elbos, t)
+function plot_traces(traces, coeff, mu, v_elbos)
     % utility function to display results of ongoing optimization
-
-    D = numel(params) / 2;
-    [coeff, mu] = transform_params(params(1:D)');
-    fprintf('iteration %d, coeff %f\n', t, coeff);
 
     subplot(3, 1, 1)
     cla();
     plot(v_elbos);
+    title('ELBO')
 
     subplot(3, 1, 2)
     cla()
     hold('on');
     plot(traces(2, :));
     plot(traces(2, :) - mu);
+    title('neighborhood')
 
     subplot(3, 1, 3)
     cla()
     hold('on');
     plot(traces(1, :));
-    plot(traces(1, :) - mu * coeff);
+    plot(traces(1, :) - coeff * mu);
+    title('ROI')
 end
