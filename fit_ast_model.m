@@ -83,8 +83,6 @@ function [coeff, mu, offset, sigma] = transform_params(params)
     % helper function to unpack and transform parameters
     [coeff, mu, offset, sigma] = split_params(params);
     coeff = normcdf(coeff);
-    mu = exp(mu);
-    offset = exp(offset);
     sigma = exp(sigma);
 end
 
@@ -116,7 +114,7 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
 
     g_x = [g_coeff, g_mu(:, :), g_offset, g_sigma];
     g_x(:, 1) = g_x(:, 1) .* exp(0.5 * -x(:, 1).^2) ./ sqrt(2 .* pi);
-    g_x(:, 2:end) = g_x(:, 2:end) .* exp(x(:, 2:end));
+    g_x(:, end) = g_x(:, end) .* exp(x(:, end));
 end
 
 function plot_traces(traces, params, v_elbos, t)
