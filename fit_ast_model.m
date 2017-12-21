@@ -1,16 +1,37 @@
-function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples)
+function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
     % TODO documentation
-    % TODO input checks
 
     % TODO meaningful priors
     % TODO meaningful initial values
 
-    maxiter = 10000;
-
-    if ~exist('n_samples', 'var')
-        n_samples = 1;
+    if ~exist('traces', 'var')
+        error('Missing traces argument.')
     end
+    traces_attr = {'size', [2, NaN], 'nonnegative'};
+    validateattributes(traces, {'numeric'}, traces_attr, '', 'traces');
 
+    if ~exist('n_sectors', 'var')
+        error('Missing n_sectors argument.')
+    end
+    n_sectors_attr = {'integer', 'positive', 'numel', 2};
+    validateattributes(n_sectors, {'numeric'}, n_sectors_attr, '', 'n_sectors');
+
+    % parse optional inputs
+    parser = inputParser;
+    posint_attr = {'scalar', 'positive', 'integer'};
+    parser.addParameter('n_samples', 1, ...
+        @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'n_samples'));
+    parser.addParameter('maxiter', 10000, ...
+        @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'maxiter'));
+    parser.addParameter('verbose', false, ...
+        @(x) validateattributes(x, {'logical'}, {'scalar'}, '', 'display'));
+
+    parser.parse(varargin{:});
+    n_samples = parser.Results.n_samples;
+    maxiter = parser.Results.maxiter;
+    verbose = parser.Results.verbose;
+
+    % create likelihood of the model and corresponding ELBO cost function
     function [logp, g_params] = logpdf_fn(params, ~)
         [logp, g_params] = logpdf_n_grad(traces, n_sectors, params);
     end
@@ -37,19 +58,17 @@ function [coeff, mu, offset, sigma] = fit_ast_model(traces, n_sectors, n_samples
         adam.step(-g_elbo);
 
         v_elbos(ii) = v_elbo;
-        if rem(ii, 100) == 0
+        if verbose && rem(ii, 100) == 0
             plot_traces(traces, adam.x, v_elbos, ii);
             pause(0.01);
         end
     end
 
-    % unpack results
-    post_mean = adam.x(1:n_params)';
-    post_log_std = adam.x(n_params+1:end)';
-    x = randn(2000, n_params) .* exp(post_log_std) + post_mean;
-    [coeff, mu, offset, sigma] = transform_params(x);
-
-    % TODO apply correction
+    % unpack results and clean traces
+    var_params = adam.x';
+    post_mean = var_params(1:n_params);
+    [coeff, mu] = transform_params(post_mean);
+    cleaned_trace = traces(1, :) - coeff * mu;
 end
 
 function [coeff, mu, offset, sigma] = split_params(params)
