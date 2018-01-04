@@ -1,5 +1,30 @@
 function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
-    % TODO documentation
+    % FIT_AST_MODEL fit an Asymmetric Student-t model to remove neuropil data
+    %
+    % [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, ...)
+    %
+    % INPUTS
+    %   traces - signals from ROI and neighborhood, as a [2 Time] array
+    %   n_sectors - number of pixels for each signal, as a 2-elements vectors
+    %
+    % NAME-VALUE PAIR INPUTS (optional)
+    %   n_samples - default: 1
+    %       number of samples used for black-box variational inference
+    %   maxiter - default: 10000
+    %       number of iterations for Adam based stochastic gradient descent
+    %   verbose - default: false
+    %       level of verbosity as either
+    %       1) false or 0: disabled
+    %       2) true or 1: print messages
+    %       3) 2 or more: plot results
+    %
+    % OUTPUTS
+    %   cleaned_trace - decontaminated signal, as a [Time] vector
+    %   var_params - optimized variational parameters, as vector concatenating
+    %       mean and variance of Gaussian posteriors
+    %   v_elbos - values of ELBO cost function, as a [maxiter] vector
+    %
+    % SEE ALSO AdamOptimizer
 
     % TODO meaningful priors (mu_mean == 1 ?, informed prior for coeff?)
     % TODO meaningful initial values

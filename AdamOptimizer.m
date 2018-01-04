@@ -29,10 +29,14 @@ classdef AdamOptimizer < handle
             %   x0 - initial value for parameters
             %
             % NAME-VALUE PAIR INPUTS (optional)
-            %   step_size - gradient descent learning rate
-            %   beta1 - 1st moment decay rate
-            %   beta2 - 2nd moment decay rate
-            %   epsilon - constant for numerical stability
+            %   step_size - default: 1e-3
+            %       gradient descent learning rate
+            %   beta1 - default: 0.9
+            %       1st moment decay rate
+            %   beta2 -default: 0.999
+            %       2nd moment decay rate
+            %   epsilon - default: sqrt(eps)
+            %       constant for numerical stability
             %
             % OUTPUTS
             %   obj - AdamOptimizer object
