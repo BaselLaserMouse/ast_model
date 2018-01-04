@@ -21,7 +21,21 @@ classdef AdamOptimizer < handle
     methods
 
         function obj = AdamOptimizer(x0, varargin)
-            % AdamOptimizer constructor
+            % ADAMOPTIMIZER create a new AdamOptimizer object
+            %
+            % obj = AdamOptimizer(x0, ...)
+            %
+            % INPUTS
+            %   x0 - initial value for parameters
+            %
+            % NAME-VALUE PAIR INPUTS (optional)
+            %   step_size - gradient descent learning rate
+            %   beta1 - 1st moment decay rate
+            %   beta2 - 2nd moment decay rate
+            %   epsilon - constant for numerical stability
+            %
+            % OUTPUTS
+            %   obj - AdamOptimizer object
 
             parser = inputParser;
             parser.addParameter('step_size', 1e-3);
