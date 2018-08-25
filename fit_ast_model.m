@@ -131,15 +131,13 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
     [coeff, mu, offset, sigma] = transform_params(x);
     mu = reshape(mu, [], 1, nt);
 
-    % log-density
+    % log-density and its gradient
     coeffs = cat(2, coeff, ones(size(coeff)));
     mus = coeffs .* mu + offset;
     sigmas = sigma ./ sqrt(n);
-    logp = ast_logpdf(mus, sigmas, y);
-    logp = sum(reshape(logp, size(x, 1), []));
+    [logp, g_mus, g_sigmas] = ast_logpdf_n_grad(mus, sigmas, y);
 
-    % gradient of log-density
-    [g_mus, g_sigmas] = ast_logpdf_grad(mus, sigmas, y);
+    logp = sum(reshape(logp, size(x, 1), []));
 
     g_coeffs = sum(g_mus .* mu, 3);
     g_coeff = g_coeffs(:, 1);
