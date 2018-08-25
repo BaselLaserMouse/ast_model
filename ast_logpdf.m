@@ -1,7 +1,7 @@
-function logp = ast_logpdf(alpha, mu, nu1, nu2, sigma, y)
+function logp = ast_logpdf(mu, sigma, y)
     % log-density of asymmetric Student-t distribution
-    logp_left = ast_logpdf_left(alpha, mu, nu1, sigma, y);
-    logp_right = ast_logpdf_right(alpha, mu, nu2, sigma, y);
+    logp_left = ast_logpdf_left(mu, sigma, y);
+    logp_right = ast_logpdf_right(mu, sigma, y);
     mask = y < mu;
     logp = mask .* logp_left + ~mask .* logp_right;
 end
