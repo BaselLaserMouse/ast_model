@@ -11,13 +11,13 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     %   n_samples - default: 1
     %       number of samples used for black-box variational inference
     %   maxiter - default: 10000
-    %       number of iterations for Adam based stochastic gradient descent
+    %       max. number of iterations for Adam based stochastic gradient descent
     %   adam_step - default: 1e-2
     %       step size for Adam optimizer
-    %   tolerance - default: 1e-8
-    %       relative change in (smoothed) ELBO to stop optimization
+    %   tolerance - default: 1e-4
+    %       relative change in averaged ELBO to stop optimization
     %   winsize - default: 200
-    %       number of points used to smooth the ELBO, for the stopping criterion
+    %       number of consecutive ELBO estimates to average (cf. tolerance)
     %   verbose - default: false
     %       level of verbosity as either
     %       1) false or 0: disabled
@@ -59,7 +59,7 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     pos_attr = {'scalar', 'positive'};
     parser.addParameter('adam_step', 1e-2, ...
         @(x) validateattributes(x, {'numeric'}, pos_attr, '', 'adam_step'));
-    parser.addParameter('tolerance', 1e-8, ...
+    parser.addParameter('tolerance', 1e-4, ...
         @(x) validateattributes(x, {'numeric'}, pos_attr, '', 'tolerance'));
     verbose_class = {'logical', 'numeric'};
     verbose_attr = {'scalar', 'integer', 'nonnegative'};
@@ -97,7 +97,7 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     init_params = [-1 * ones(1, n_params), -5 * ones(1, n_params)];
     adam = AdamOptimizer(init_params, 'step_size', adam_step);
     v_elbos = nan(1, maxiter);
-    old_s_elbo = -inf;
+    old_elbo_avg = -inf;
 
     for ii = 1:maxiter
         [v_elbo, g_elbo] = elbo_fn(adam.x, ii);
@@ -105,12 +105,12 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
         adam.step(-g_elbo);
 
         % stop if smoothed ELBO don't improve enough
-        if ii >= winsize
-            new_s_elbo = mean(v_elbos(ii-winsize+1:ii));
-            if abs(old_s_elbo - new_s_elbo) < tolerance * abs(old_s_elbo)
+        if rem(ii, winsize) == 0
+            new_elbo_avg = mean(v_elbos(ii-winsize+1:ii));
+            if abs(old_elbo_avg - new_elbo_avg) < tolerance * abs(old_elbo_avg)
                 break;
             end
-            old_s_elbo = new_s_elbo;
+            old_elbo_avg = new_elbo_avg;
         end
 
         % display extra information
