@@ -12,6 +12,12 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     %       number of samples used for black-box variational inference
     %   maxiter - default: 10000
     %       number of iterations for Adam based stochastic gradient descent
+    %   adam_step - default: 1e-2
+    %       step size for Adam optimizer
+    %   tolerance - default: 1e-8
+    %       relative change in (smoothed) ELBO to stop optimization
+    %   winsize - default: 200
+    %       number of points used to smooth the ELBO, for the stopping criterion
     %   verbose - default: false
     %       level of verbosity as either
     %       1) false or 0: disabled
@@ -48,6 +54,13 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'n_samples'));
     parser.addParameter('maxiter', 10000, ...
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'maxiter'));
+    parser.addParameter('winsize', 200, ...
+        @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'winsize'));
+    pos_attr = {'scalar', 'positive'};
+    parser.addParameter('adam_step', 1e-2, ...
+        @(x) validateattributes(x, {'numeric'}, pos_attr, '', 'adam_step'));
+    parser.addParameter('tolerance', 1e-8, ...
+        @(x) validateattributes(x, {'numeric'}, pos_attr, '', 'tolerance'));
     verbose_class = {'logical', 'numeric'};
     verbose_attr = {'scalar', 'integer', 'nonnegative'};
     parser.addParameter('verbose', false, ...
@@ -56,6 +69,9 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     parser.parse(varargin{:});
     n_samples = parser.Results.n_samples;
     maxiter = parser.Results.maxiter;
+    winsize = parser.Results.winsize;
+    adam_step = parser.Results.adam_step;
+    tolerance = parser.Results.tolerance;
     verbose = parser.Results.verbose;
 
     % rescale traces to correspond to prior assumptions
@@ -79,13 +95,23 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
 
     %  stochastic gradient descent
     init_params = [-1 * ones(1, n_params), -5 * ones(1, n_params)];
-    adam = AdamOptimizer(init_params, 'step_size', 1e-2);
+    adam = AdamOptimizer(init_params, 'step_size', adam_step);
     v_elbos = nan(1, maxiter);
+    old_s_elbo = -inf;
 
     for ii = 1:maxiter
         [v_elbo, g_elbo] = elbo_fn(adam.x, ii);
         v_elbos(ii) = v_elbo;
         adam.step(-g_elbo);
+
+        % stop if smoothed ELBO don't improve enough
+        if ii >= winsize
+            new_s_elbo = mean(v_elbos(ii-winsize+1:ii));
+            if abs(old_s_elbo - new_s_elbo) < tolerance * abs(old_s_elbo)
+                break;
+            end
+            old_s_elbo = new_s_elbo;
+        end
 
         % display extra information
         if verbose && rem(ii, 100) == 0
