@@ -137,7 +137,7 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
     sigmas = sigma ./ sqrt(n);
     [logp, g_mus, g_sigmas] = ast_logpdf_n_grad(mus, sigmas, y);
 
-    logp = sum(reshape(logp, size(x, 1), []));
+    logp = sum(reshape(logp, size(x, 1), []), 2);
 
     g_coeffs = sum(g_mus .* mu, 3);
     g_coeff = g_coeffs(:, 1);
