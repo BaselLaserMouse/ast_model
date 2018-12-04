@@ -11,4 +11,4 @@ traces = [cell_sig + npil_sig * 0.7 + 5 + randn(1, nt);
 
 %% try to decontaminate signal
 
-cleaned_trace = fit_ast_model(traces, [1, 1], 'verbose', 2);
+cleaned_trace = fit_ast_model(traces, [1, 1], 'verbose', 2, 'n_dct', 5);

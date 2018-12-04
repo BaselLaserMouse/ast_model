@@ -1,4 +1,4 @@
-function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
+function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
     % FIT_AST_MODEL fit an Asymmetric Student-t model to remove neuropil data
     %
     % [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, ...)
@@ -28,6 +28,7 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     %
     % OUTPUTS
     %   cleaned_trace - decontaminated signal, as a [Time] vector
+    %   f0 - estimated F0 baseline, as a scalar
     %   var_params - optimized variational parameters, as vector concatenating
     %       mean and variance of Gaussian posteriors
     %   v_elbos - values of ELBO cost function, as a [maxiter] vector
@@ -121,11 +122,11 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
 
         % display extra information
         if verbose && rem(ii, 100) == 0
-            [coeff, mu] = transform_params(adam.x(1:n_params)', n_dct);
+            [coeff, mu, offset] = transform_params(adam.x(1:n_params)', n_dct);
             fprintf('iteration %d, elbo %f, coeff %f\n', ii, v_elbo, coeff);
 
             if verbose > 1
-                plot_traces(traces, coeff, mu, v_elbos);
+                plot_traces(traces, coeff, mu, offset, dct_basis, v_elbos);
                 pause(0.01);
             end
         end
@@ -134,8 +135,14 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     % unpack results and clean traces
     var_params = adam.x';
     post_mean = var_params(1:n_params);
-    [coeff, mu] = transform_params(post_mean, n_dct);
-    cleaned_trace = (traces(1, :) - coeff * mu - 1 + min_traces) * scale;
+    [coeff, mu, offset] = transform_params(post_mean, n_dct);
+
+    npil = coeff * mu;
+    offset = reshape(offset, 2, n_dct);
+    trend = offset(1, 2:end) * dct_basis(2:end, :);
+
+    cleaned_trace = (traces(1, :) - npil - trend - 1 + min_traces) * scale;
+    f0 = (offset(1) - 1) * scale;
 end
 
 function [coeff, mu, offset, sigma] = split_params(params, n_dct)
@@ -186,26 +193,36 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, dct_basis, x)
     g_x(:, end) = g_x(:, end) .* exp(x(:, end));
 end
 
-function plot_traces(traces, coeff, mu, v_elbos)
+function plot_traces(traces, coeff, mu, offset, dct_basis, v_elbos)
     % utility function to display results of ongoing optimization
+
+    offset = reshape(offset, 2, []);
+    trend = offset * dct_basis;
 
     subplot(3, 1, 1)
     cla();
     plot(v_elbos);
+    axis('tight');
     title('ELBO')
 
     subplot(3, 1, 2)
     cla()
     hold('on');
     plot(traces(2, :));
-    plot(traces(2, :) - mu);
+    plot(traces(2, :) - mu - trend(2, :) + offset(2, 1));
+    plot(trend(2, :), 'k', 'LineWidth', 2);
+    axis('tight');
     title('neighborhood')
 
     subplot(3, 1, 3)
     cla()
     hold('on');
     plot(traces(1, :));
-    plot(traces(1, :) - coeff * mu);
+    plot(traces(1, :) - coeff * mu - trend(1, :) + offset(1, 1));
+    plot(trend(1, :), 'k', 'LineWidth', 2);
+    line([1, size(traces, 2)], [offset(1, 1), offset(1, 1)], ...
+         'Color', [0.6, 0.6, 0.6], 'LineWidth', 2);
+    axis('tight');
     title('ROI')
 end
 
