@@ -73,6 +73,7 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     adam_step = parser.Results.adam_step;
     tolerance = parser.Results.tolerance;
     verbose = parser.Results.verbose;
+    n_dct = 1;  % TODO make it a parameter
 
     % rescale traces to correspond to prior assumptions
     scale = std(traces(:));
@@ -81,11 +82,12 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     traces = traces - min_traces + 1;
 
     % create likelihood of the model and corresponding ELBO cost function
+    dct_basis = make_dct_basis(n_dct, size(traces, 2));
     function [logp, g_params] = logpdf_fn(params, ~)
-        [logp, g_params] = logpdf_n_grad(traces, n_sectors, params);
+        [logp, g_params] = logpdf_n_grad(traces, n_sectors, dct_basis, params);
     end
 
-    n_params = size(traces, 2) + 4;
+    n_params = size(traces, 2) + n_dct * 2 + 2;
     prior_mean = zeros(1, n_params);
     prior_log_std = zeros(1, n_params);
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
@@ -115,7 +117,7 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
 
         % display extra information
         if verbose && rem(ii, 100) == 0
-            [coeff, mu] = transform_params(adam.x(1:n_params)');
+            [coeff, mu] = transform_params(adam.x(1:n_params)', n_dct);
             fprintf('iteration %d, elbo %f, coeff %f\n', ii, v_elbo, coeff);
 
             if verbose > 1
@@ -128,38 +130,42 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     % unpack results and clean traces
     var_params = adam.x';
     post_mean = var_params(1:n_params);
-    [coeff, mu] = transform_params(post_mean);
+    [coeff, mu] = transform_params(post_mean, n_dct);
     cleaned_trace = (traces(1, :) - coeff * mu - 1 + min_traces) * scale;
 end
 
-function [coeff, mu, offset, sigma] = split_params(params)
+function [coeff, mu, offset, sigma] = split_params(params, n_dct)
     % helper function to unpack parameters
     coeff = params(:, 1);
-    mu = params(:, 2:end-3);
-    offset = params(:, end-2:end-1);
+    mu = params(:, 2:end-2*n_dct-1);
+    offset = params(:, end-2*n_dct:end-1);
     sigma = params(:, end);
 end
 
-function [coeff, mu, offset, sigma] = transform_params(params)
+function [coeff, mu, offset, sigma] = transform_params(params, n_dct)
     % helper function to unpack and transform parameters
-    [coeff, mu, offset, sigma] = split_params(params);
+    [coeff, mu, offset, sigma] = split_params(params, n_dct);
     coeff = normcdf(coeff);
     sigma = exp(sigma);
 end
 
-function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
+function [logp, g_x] = logpdf_n_grad(traces, n_sectors, dct_basis, x)
     % evaluate log-density of AST model and its gradient wrt. mu and sigma
 
     nt = size(traces, 2);
     y = reshape(traces, 1, 2, []);
     n = reshape(n_sectors, 1, 2);
+    n_dct = size(dct_basis, 1);
 
-    [coeff, mu, offset, sigma] = transform_params(x);
+    [coeff, mu, offset, sigma] = transform_params(x, n_dct);
     mu = reshape(mu, [], 1, nt);
+    offset = reshape(offset, [], 2, n_dct);
+    dct_basis = reshape(dct_basis, 1, 1, n_dct, []);
 
     % log-density and its gradient
     coeffs = cat(2, coeff, ones(size(coeff)));
-    mus = coeffs .* mu + offset;
+    offsets = reshape(sum(offset .* dct_basis, 3), [], 2, nt);
+    mus = coeffs .* mu + offsets;
     sigmas = sigma ./ sqrt(n);
     [logp, g_mus, g_sigmas] = ast_logpdf_n_grad(mus, sigmas, y);
 
@@ -168,10 +174,10 @@ function [logp, g_x] = logpdf_n_grad(traces, n_sectors, x)
     g_coeffs = sum(g_mus .* mu, 3);
     g_coeff = g_coeffs(:, 1);
     g_mu = sum(g_mus .* coeffs, 2);
-    g_offset = sum(g_mus, 3);
+    g_offset = sum(reshape(g_mus, [], 2, 1, nt) .* dct_basis, 4);
     g_sigma = sum(sum(g_sigmas ./ sqrt(n), 3), 2);
 
-    g_x = [g_coeff, g_mu(:, :), g_offset, g_sigma];
+    g_x = [g_coeff, g_mu(:, :), g_offset(:, :), g_sigma];
     g_x(:, 1) = g_x(:, 1) .* exp(0.5 * -x(:, 1).^2) ./ sqrt(2 .* pi);
     g_x(:, end) = g_x(:, end) .* exp(x(:, end));
 end
@@ -197,4 +203,14 @@ function plot_traces(traces, coeff, mu, v_elbos)
     plot(traces(1, :));
     plot(traces(1, :) - coeff * mu);
     title('ROI')
+end
+
+function M = make_dct_basis(n_dct, n_frames)
+    % create a incomplete DCT basis
+    M = zeros(n_dct, n_frames);
+    M(1, :) = 1 / sqrt(n_frames);
+    for ii = 2:n_dct
+        xs = (2 .* (0:n_frames-1) + 1) .* (ii - 1);
+        M(ii, :) = sqrt(2 / n_frames) .* cos(pi .* xs / (2 * n_frames));
+    end
 end
