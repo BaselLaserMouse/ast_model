@@ -8,6 +8,8 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     %   n_sectors - number of pixels for each signal, as a 2-elements vectors
     %
     % NAME-VALUE PAIR INPUTS (optional)
+    %   n_dct - default: 1
+    %       number of DCT basis functions to use to approximate trends
     %   n_samples - default: 1
     %       number of samples used for black-box variational inference
     %   maxiter - default: 10000
@@ -50,6 +52,8 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
     % parse optional inputs
     parser = inputParser;
     posint_attr = {'scalar', 'positive', 'integer'};
+    parser.addParameter('n_dct', 1, ...
+        @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'n_dct'));
     parser.addParameter('n_samples', 1, ...
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'n_samples'));
     parser.addParameter('maxiter', 10000, ...
@@ -67,13 +71,13 @@ function [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors,
         @(x) validateattributes(x, verbose_class, verbose_attr, '', 'verbose'));
 
     parser.parse(varargin{:});
+    n_dct = parser.Results.n_dct;
     n_samples = parser.Results.n_samples;
     maxiter = parser.Results.maxiter;
     winsize = parser.Results.winsize;
     adam_step = parser.Results.adam_step;
     tolerance = parser.Results.tolerance;
     verbose = parser.Results.verbose;
-    n_dct = 1;  % TODO make it a parameter
 
     % rescale traces to correspond to prior assumptions
     scale = std(traces(:));
@@ -207,10 +211,11 @@ end
 
 function M = make_dct_basis(n_dct, n_frames)
     % create a incomplete DCT basis
+    % TODO check proper normalization
     M = zeros(n_dct, n_frames);
-    M(1, :) = 1 / sqrt(n_frames);
+    M(1, :) = 1;
     for ii = 2:n_dct
         xs = (2 .* (0:n_frames-1) + 1) .* (ii - 1);
-        M(ii, :) = sqrt(2 / n_frames) .* cos(pi .* xs / (2 * n_frames));
+        M(ii, :) = sqrt(2) .* cos(pi .* xs / (2 * n_frames));
     end
 end
