@@ -13,7 +13,7 @@ traces = [cell_sig + npil_sig * 0.7 + 5 + randn(1, nt);
 
 rng(1);
 
-nt = 1000;
+nt = 5000;
 noise_std = 0.1;
 
 template = -exp(-(1:30)) + exp(-0.2 * (1:30));
@@ -23,8 +23,8 @@ cell_trace = conv(cell_spikes, template, 'same');
 cell_trend = 1.1 - (1:nt).^2 ./ nt.^2 + 5;
 cell_noise = randn(1, nt) * noise_std;
 
-npil_spikes = poissrnd(0.005, 1, nt);
-npil_trace = conv(npil_spikes, template, 'same');
+npil_spikes = poissrnd(0.01, 1, nt);
+npil_trace = conv(npil_spikes, template, 'same') + sin((1:nt) / 20) * 0.2;
 npil_trend = (1:nt).^2 ./ nt.^2 + 3;
 npil_noise = randn(1, nt) * noise_std;
 

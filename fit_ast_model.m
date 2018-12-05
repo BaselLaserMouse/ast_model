@@ -35,8 +35,6 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     %
     % SEE ALSO AdamOptimizer
 
-    % TODO meaningful priors (informed prior for coeff?)
-
     if ~exist('traces', 'var')
         error('Missing traces argument.')
     end
@@ -95,6 +93,11 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     n_params = n_frames + n_dct * 2 + 2;
     prior_mean = zeros(1, n_params);
     prior_log_std = zeros(1, n_params);
+
+    % TODO meaningful priors (informed prior for coeff?)
+    % prior_mean(1) = norminv(0.9);
+    % prior_log_std(1) = log(0.1);
+
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
 
     % fixed seed for reproducibility
