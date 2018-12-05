@@ -25,7 +25,7 @@ cell_noise = randn(1, nt) * noise_std;
 
 npil_spikes = poissrnd(0.005, 1, nt);
 npil_trace = conv(npil_spikes, template, 'same');
-npil_trend = 1.1 + (1:nt).^2 ./ nt.^2 + 3;
+npil_trend = (1:nt).^2 ./ nt.^2 + 3;
 npil_noise = randn(1, nt) * noise_std;
 
 traces = [cell_trace + cell_trend + cell_noise + 0.9 * npil_trace;

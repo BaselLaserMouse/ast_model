@@ -35,8 +35,7 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     %
     % SEE ALSO AdamOptimizer
 
-    % TODO meaningful priors (mu_mean == 1 ?, informed prior for coeff?)
-    % TODO meaningful initial values
+    % TODO meaningful priors (informed prior for coeff?)
 
     if ~exist('traces', 'var')
         error('Missing traces argument.')
@@ -84,15 +83,16 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     scale = std(traces(:));
     traces = traces / scale;
     min_traces = min(traces(:));
-    traces = traces - min_traces + 1;
+    traces = traces - min_traces;
 
     % create likelihood of the model and corresponding ELBO cost function
-    dct_basis = make_dct_basis(n_dct, size(traces, 2));
+    n_frames = size(traces, 2);
+    dct_basis = make_dct_basis(n_dct, n_frames);
     function [logp, g_params] = logpdf_fn(params, ~)
         [logp, g_params] = logpdf_n_grad(traces, n_sectors, dct_basis, params);
     end
 
-    n_params = size(traces, 2) + n_dct * 2 + 2;
+    n_params = n_frames + n_dct * 2 + 2;
     prior_mean = zeros(1, n_params);
     prior_log_std = zeros(1, n_params);
     elbo_fn = make_elbo(@logpdf_fn, prior_mean, prior_log_std, n_samples);
@@ -101,7 +101,14 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     rng(12345);
 
     %  stochastic gradient descent
-    init_params = [-1 * ones(1, n_params), -5 * ones(1, n_params)];
+    dct_coeffs = traces * dct_basis' / n_frames;
+    init_params_mean = [ ...
+        norminv(0.5),  ... contamination ratio
+        traces(2, :) - dct_coeffs(2, :) * dct_basis,  ... neuropil without trend
+        dct_coeffs(:)',  ... DCT coefficients
+        log(1)];  ... noise level
+    init_params = [init_params_mean, -5 * ones(1, n_params)];
+
     adam = AdamOptimizer(init_params, 'step_size', adam_step);
     v_elbos = nan(1, maxiter);
     old_elbo_avg = -inf;
@@ -141,8 +148,8 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     offset = reshape(offset, 2, n_dct);
     trend = offset(1, 2:end) * dct_basis(2:end, :);
 
-    cleaned_trace = (traces(1, :) - npil - trend - 1 + min_traces) * scale;
-    f0 = (offset(1) - 1) * scale;
+    cleaned_trace = (traces(1, :) - npil - trend + min_traces) * scale;
+    f0 = (offset(1) + min_traces) * scale;
 end
 
 function [coeff, mu, offset, sigma] = split_params(params, n_dct)
