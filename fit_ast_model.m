@@ -38,7 +38,7 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     if ~exist('traces', 'var')
         error('Missing traces argument.')
     end
-    traces_attr = {'size', [2, NaN], 'nonnegative'};
+    traces_attr = {'size', [2, NaN]};
     validateattributes(traces, {'numeric'}, traces_attr, '', 'traces');
 
     if ~exist('n_sectors', 'var')
@@ -78,7 +78,7 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     verbose = parser.Results.verbose;
 
     % rescale traces to correspond to prior assumptions
-    scale = std(traces(:));
+    scale = max(std(traces, [], 2));
     traces = traces / scale;
     min_traces = min(traces(:));
     traces = traces - min_traces;
