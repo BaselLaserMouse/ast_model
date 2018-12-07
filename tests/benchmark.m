@@ -46,28 +46,43 @@ save('benchmark.mat', 'mse_nothing', 'mse_detrend', 'mse_ast', 'mse_best');
 
 %% display results
 
-% average MSE
-mean_mse_nothing = squeeze(mean(mse_nothing, 1));
-mean_mse_detrend = squeeze(mean(mse_detrend, 1));
-mean_mse_ast = squeeze(mean(mse_ast, 1));
-mean_mse_best = squeeze(mean(mse_best, 1));
-
 % main figure
 figure('Position', [344, 683, 1640, 406]);
 
+fig_axes = cell(1, n_noise_std);
 for ii = 1:n_noise_std
-    subplot(1, n_noise_std, ii);
+    fig_axes{ii} = subplot(1, n_noise_std, ii);
     hold('on');
     grid();
-    plot(npil_ratio, mean_mse_nothing(ii, :), '-o');
-    plot(npil_ratio, mean_mse_detrend(ii, :), '-o');
-    plot(npil_ratio, mean_mse_ast(ii, :), '-o');
-    plot(npil_ratio, mean_mse_best(ii, :), '-o');
+    h_nothing = plot_trace(npil_ratio, mse_nothing(:, ii, :));
+    h_detrend = plot_trace(npil_ratio, mse_detrend(:, ii, :));
+    h_ast = plot_trace(npil_ratio, mse_ast(:, ii, :));
+    h_best = plot_trace(npil_ratio, mse_best(:, ii, :));
     xlabel('contamination ratio');
     ylabel('MSE');
     title(sprintf('noise std = %.3f', noise_std(ii)));
 end
-legend('nothing', 'detrend', 'ASt', 'best');
+linkaxes(cat(1, fig_axes{:}), 'xy');
+legend([h_nothing, h_detrend, h_ast, h_best], ...
+       {'nothing', 'detrend', 'ASt', 'best'}, 'Location', 'southeast');
+
+%% display typical data for each noise level
+
+figure('Position', [50, 358, 2117, 889])
+
+for ii = 1:n_noise_std
+    [traces, cell_trace, cell_trend, cell_npil] = ...
+        fake_data(nt, noise_std(ii), 0.5, 1);
+    subplot(n_noise_std, 1, ii);
+    hold('on');
+    grid();
+    plot(traces(1, :));
+    plot(cell_trace, 'LineWidth', 2);
+    ylabel(sprintf('noise std = %.3f', noise_std(ii)));
+end
+
+xlabel('frames');
+legend('raw trace', 'true trace');
 
 %% functions used in this script
 
@@ -99,4 +114,15 @@ function ca_trace = calcium_trace(lambda, nt)
     template = template / max(template);
     spikes = poissrnd(lambda, 1, nt);
     ca_trace = conv(spikes, template, 'same');
+end
+
+function h_line = plot_trace(npil_ratio, mse_data)
+    mean_mse = squeeze(mean(mse_data, 1))';
+    std_mse = squeeze(std(mse_data, [], 1))';
+    h_patch = fill([npil_ratio, fliplr(npil_ratio)], ...
+                         [mean_mse + std_mse, fliplr(mean_mse - std_mse)], 'r');
+    h_patch.FaceAlpha = 0.2;
+    h_patch.LineStyle = 'none';
+    h_line = plot(npil_ratio, mean_mse, '-o');
+    h_patch.FaceColor = h_line.Color;
 end
