@@ -1,4 +1,4 @@
-function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
+function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
     % FIT_AST_MODEL fit an Asymmetric Student-t model to remove neuropil data
     %
     % [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, ...)
@@ -10,6 +10,8 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     % NAME-VALUE PAIR INPUTS (optional)
     %   n_dct - default: 1
     %       number of DCT basis functions to use to approximate trends
+    %   detrend - default: 'subtract'
+    %       detrending as either 'none', 'subtract' or 'divide' (see remarks)
     %   n_samples - default: 1
     %       number of samples used for black-box variational inference
     %   maxiter - default: 10000
@@ -28,10 +30,18 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     %
     % OUTPUTS
     %   cleaned_trace - decontaminated signal, as a [Time] vector
-    %   f0 - estimated F0 baseline, as a scalar
+    %   trend - estimated trend, as a [Time] vector
     %   var_params - optimized variational parameters, as vector concatenating
     %       mean and variance of Gaussian posteriors
     %   v_elbos - values of ELBO cost function, as a [maxiter] vector
+    %
+    % REMARKS
+    %   A trend is estimated as part of the decontamination model. By default,
+    %   the non-constant term of the trend is removed from the decontaminated
+    %   trace ('subtract' strategy). You can also use the estimated trend as F0
+    %   baseline to compute delta F over F0 ('divide' strategy). Finally, if you
+    %   use the 'none' strategy, the trend is not removed at all from the
+    %   decontaminated trace.
     %
     % SEE ALSO AdamOptimizer
 
@@ -67,15 +77,20 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
     verbose_attr = {'scalar', 'integer', 'nonnegative'};
     parser.addParameter('verbose', false, ...
         @(x) validateattributes(x, verbose_class, verbose_attr, '', 'verbose'));
+    parser.addParameter('detrend', 'subtract');
 
     parser.parse(varargin{:});
     n_dct = parser.Results.n_dct;
+    detrend = parser.Results.detrend;
     n_samples = parser.Results.n_samples;
     maxiter = parser.Results.maxiter;
     winsize = parser.Results.winsize;
     adam_step = parser.Results.adam_step;
     tolerance = parser.Results.tolerance;
     verbose = parser.Results.verbose;
+
+    detrend_types = {'none', 'subtract', 'divide'};
+    detrend = validatestring(detrend, detrend_types, '', 'detrend');
 
     % rescale traces to correspond to prior assumptions
     scale = max(std(traces, [], 2));
@@ -142,17 +157,23 @@ function [cleaned_trace, f0, var_params, v_elbos] = fit_ast_model(traces, n_sect
         end
     end
 
-    % unpack results and clean traces
+    % unpack results and clean the ROI trace
     var_params = adam.x';
     post_mean = var_params(1:n_params);
     [coeff, mu, offset] = transform_params(post_mean, n_dct);
 
     npil = coeff * mu;
-    offset = reshape(offset, 2, n_dct);
-    trend = offset(1, 2:end) * dct_basis(2:end, :);
+    cleaned_trace = (traces(1, :) - npil + min_traces) * scale;
 
-    cleaned_trace = (traces(1, :) - npil - trend + min_traces) * scale;
-    f0 = (offset(1) + min_traces) * scale;
+    % detrend the trace
+    offset = reshape(offset, 2, n_dct);
+    trend = (offset(1, :) * dct_basis + min_traces) * scale;
+
+    if strcmp(detrend, 'subtract')
+        cleaned_trace = cleaned_trace - trend + mean(trend);
+    elseif strcmp(detrend, 'divide')
+        cleaned_trace = (cleaned_trace - trend) ./ trend;
+    end
 end
 
 function [coeff, mu, offset, sigma] = split_params(params, n_dct)
