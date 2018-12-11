@@ -1,7 +1,7 @@
 function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_sectors, varargin)
     % FIT_AST_MODEL fit an Asymmetric Student-t model to remove neuropil data
     %
-    % [cleaned_trace, var_params, v_elbos] = fit_ast_model(traces, n_sectors, ...)
+    % [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_sectors, ...)
     %
     % INPUTS
     %   traces - signals from ROI and neighborhood, as a [2 Time] array
