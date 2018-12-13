@@ -10,6 +10,11 @@ function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_s
     % NAME-VALUE PAIR INPUTS (optional)
     %   n_dct - default: 1
     %       number of DCT basis functions to use to approximate trends
+    %   fmax - default: nan
+    %       max. frequency for cosine functions used to estimate trends,
+    %       replaces 'n_dct' if specified
+    %   fs - default: 1
+    %       sampling frequency, used in combination of 'fmax'
     %   detrend - default: 'subtract'
     %       detrending as either 'none', 'subtract' or 'divide' (see remarks)
     %   n_samples - default: 1
@@ -43,7 +48,10 @@ function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_s
     %   use the 'none' strategy, the trend is not removed at all from the
     %   decontaminated trace.
     %
-    % SEE ALSO AdamOptimizer
+    %   The DCT basis used to estimate trends corresponds to the inverse of the
+    %   DCT-2, without the sqrt(N) normalization.
+    %
+    % SEE ALSO AdamOptimizer, idct
 
     if ~exist('traces', 'var')
         error('Missing traces argument.')
@@ -60,15 +68,19 @@ function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_s
     % parse optional inputs
     parser = inputParser;
     posint_attr = {'scalar', 'positive', 'integer'};
-    parser.addParameter('n_dct', 1, ...
+    pos_attr = {'scalar', 'positive'};
+    parser.addParameter('n_dct', nan, ...
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'n_dct'));
+    parser.addParameter('fs', 1, ...
+        @(x) validateattributes(x, {'numeric'}, pos_attr, '', 'fs'));
+    parser.addParameter('fmax', nan, ...
+        @(x) validateattributes(x, {'numeric'}, pos_attr, '', 'fmax'));
     parser.addParameter('n_samples', 1, ...
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'n_samples'));
     parser.addParameter('maxiter', 10000, ...
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'maxiter'));
     parser.addParameter('winsize', 200, ...
         @(x) validateattributes(x, {'numeric'}, posint_attr, '', 'winsize'));
-    pos_attr = {'scalar', 'positive'};
     parser.addParameter('adam_step', 1e-2, ...
         @(x) validateattributes(x, {'numeric'}, pos_attr, '', 'adam_step'));
     parser.addParameter('tolerance', 1e-4, ...
@@ -81,6 +93,8 @@ function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_s
 
     parser.parse(varargin{:});
     n_dct = parser.Results.n_dct;
+    fs = parser.Results.fs;
+    fmax = parser.Results.fmax;
     detrend = parser.Results.detrend;
     n_samples = parser.Results.n_samples;
     maxiter = parser.Results.maxiter;
@@ -92,6 +106,17 @@ function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_s
     detrend_types = {'none', 'subtract', 'divide'};
     detrend = validatestring(detrend, detrend_types, '', 'detrend');
 
+    % deduce number of DCT basis functions from fmax, if fmax is given
+    n_frames = size(traces, 2);
+    if ~isnan(fmax)
+        if ~isnan(n_dct)
+            warning('Ignoring n_dct argument, as fmax is provided.');
+        end
+        n_dct = floor(fmax .* (2 * n_frames) ./ fs + 1);
+    elseif isnan(n_dct)
+        n_dct = 1;
+    end
+
     % rescale traces to correspond to prior assumptions
     scale = max(std(traces, [], 2));
     traces = traces / scale;
@@ -99,7 +124,6 @@ function [cleaned_trace, trend, var_params, v_elbos] = fit_ast_model(traces, n_s
     traces = traces - min_traces;
 
     % create likelihood of the model and corresponding ELBO cost function
-    n_frames = size(traces, 2);
     dct_basis = make_dct_basis(n_dct, n_frames);
     function [logp, g_params] = logpdf_fn(params, ~)
         [logp, g_params] = logpdf_n_grad(traces, n_sectors, dct_basis, params);
@@ -258,12 +282,12 @@ function plot_traces(traces, coeff, mu, offset, dct_basis, v_elbos)
 end
 
 function M = make_dct_basis(n_dct, n_frames)
-    % create a incomplete DCT basis
-    % TODO check proper normalization
+    % create a unnormalized incomplete DCT basis
     M = zeros(n_dct, n_frames);
     M(1, :) = 1;
     for ii = 2:n_dct
-        xs = (2 .* (0:n_frames-1) + 1) .* (ii - 1);
-        M(ii, :) = sqrt(2) .* cos(pi .* xs / (2 * n_frames));
+        ns = 0:n_frames-1;
+        M(ii, :) = ...
+            sqrt(2) .* cos(pi .* (2 .* ns + 1) .* (ii - 1) / (2 * n_frames));
     end
 end
