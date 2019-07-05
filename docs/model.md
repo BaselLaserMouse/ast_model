@@ -10,7 +10,7 @@ contributing to both ROI and surrounding fluorescence:
 
 \begin{align}
     f_r(t) &\sim \mathrm{ASt}(\alpha z(t) + \mu_r, \sigma^2) \\
-    f_n(t) &\sim \mathrm{ASt}(z(t) + \mu_n, \sigma^2 / N) \label{eq:ast_n}\\
+    f_n(t) &\sim \mathrm{ASt}(z(t) + \mu_n, \sigma^2 / N) \\
     z(t) &\sim \mathcal{N}(0, s^2)
 \end{align}
 
@@ -18,13 +18,16 @@ Here, $z(t)$ is the time-varying neuropil trace, $\alpha$ is the contamination
 coefficient (constrained between 0 and 1 for the ROI and fixed to 1 for the
 surround), and $\sigma^2$ determines the scale of the two distributions.
 
-The factor $N$ was set to 40, the typical ratio of the areas of surround and
-ROI masks. The ASt distribution has different degrees of freedom $\nu_1$ and
-$\nu_2$ for its left and right tails. We set $\nu_1=30$ and $\nu_2=1$, such
-that the left tail was approximately Gaussian, while the right tail resembled
-the Cauchy distribution. Thus the model allows for large positive but not
-negative deviations, consistent with the nature of calcium fluorescence
-signals.
+The factor $N$ corresponds to the ratio of the areas of surround and ROI masks.
+The ASt distribution has different degrees of freedom $\nu_1$ and $\nu_2$ for
+its left and right tails. We set $\nu_1=30$ and $\nu_2=1$, such that the left
+tail was approximately Gaussian, while the right tail resembled the Cauchy
+distribution. Thus the model allows for large positive but not negative
+deviations, consistent with the nature of calcium fluorescence signals.
+
+The following figure represents the corresponding probabilistic graphical
+model, gray nodes indicating observed variables and white nodes latent
+variables.
 
 \begin{tikzpicture}
     \node[latent] (sigma_z) {$s$};
@@ -41,39 +44,27 @@ signals.
     \edge {z, sigma_f, mu_r} {f_r};
     \edge {alpha, z} {f_r};
 \end{tikzpicture}
-<!--
-  \caption{Probabilistic graphical model for neuropil contamination. By
-  convention, gray nodes indicate observed random variables, while white nodes
-  are unobserved and their posterior distribution has to be inferred from the
-  data.} \label{fig:neuropil}
--->
 
-The advantage of this approach over widely used methods, lies in the use of the
-ASt distribution to model deviations in both ROI and surround signals. The
-long right tail of the ASt distribution helps prevent over-estimating the
-neuropil component for densely active cells. At the same time, the use of the
-ASt distribution for the surround signal helps account for transient increases
+The advantage of this approach over other methods, lies in the use of the ASt
+distribution to model deviations in both ROI and surround signals. The long
+right tail of the ASt distribution helps prevent over-estimating the neuropil
+component for densely active cells. At the same time, the use of the ASt
+distribution for the surround signal helps account for transient increases
 in fluorescence arising from unannotated neurites or cell bodies, which could
 otherwise result in false negative transients in the corrected trace.
 
 The challenge of fitting this model is that the posterior distributions over
 model parameters, including the neuropil trace $z(t)$, cannot be computed
-exactly. Instead, we will use variational Bayesian methods to approximate
-them. The neuropil corrected fluorescence trace will then be estimated as the
-``noise'' of the ASt model:
+exactly. Instead, we use the black-box stochastic variational inference (BBSVI)
+with reparametrization gradients to fit an approximate posterior distribution.
 
-$$f(t) = f_r(t)- \alpha z(t)$$
+The neuropil corrected fluorescence trace will then be estimated as the "noise"
+of the ASt model:
 
-Optimization and correction is carried out using the function `fit_ast_model`,
-providing the neuropil and drift-corrected activity traces: 
-```
-activity_corrected = fit_ast_model([raw_activity - drift; neuropil], [1 40]);
-```
+$$f(t) = f_r(t)- \hat{\alpha} \hat{z}(t)$$
 
-The second argument specifies the relative size of the ROI and donut masks and
-is used to set the relative scale two ASt distributions ($N$ in Eq.
-\ref{eq:ast_n}). In practice, the results are robust to a wide range of
-settings for these values. 
+where $\hat{\alpha}$ and $\hat{z}(t)$ are point estimates derived from the
+approximate posterior distribution, e.g. its mean.
 
 The ASt model is not limited to finding common contaminating signals in two
 traces. In principle, we could split the neuropil donut into multiple sectors
