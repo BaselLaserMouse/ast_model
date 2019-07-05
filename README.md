@@ -8,4 +8,8 @@ folder to your MATLAB path.
 
 Decontamination is done by the `fit_ast_model` function. You should provide 2
 traces (cell ROI and neuropil ROI) and the number of pixels corresponding to
-each ROI.
+each ROI. Use `help fit_ast_model` or `doc fit_ast_model` in MATLAB to get a
+description of all available options.
+
+A description of the probabilistic model is also available
+[online](https://basellasermouse.github.io/ast_model/model.html).
