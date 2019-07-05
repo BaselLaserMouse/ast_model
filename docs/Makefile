@@ -2,5 +2,5 @@
 
 all: model.html
 
-model.html: model.md
-	pandoc --lua-filter tikz.lua --mathjax -s -o "$@" "$<"
+model.html: model.md style.css
+	pandoc --lua-filter tikz.lua --mathjax -s -o "$@" "$<" -c "$(word 2,$^)"
