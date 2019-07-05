@@ -1,11 +1,17 @@
-# Model description
+---
+title: ASt model description
+bibliography: references.bib
+link-citations: true
+csl: council-of-science-editors-alphabetical.csl
+css: style.css
+---
 
 There are several approaches for dealing with neuropil contamination, the most
 common involve subtracting the surrounding neuropil fluorescence from each ROI
 with a scale factor determined by linear regression or hand-picked manually.
 
 We fit both ROI and surround fluorescence to asymmetric Student-t (ASt)
-distributions, whose mean was determined by a common neuropil signal
+distributions [@Zhu2010], whose mean was determined by a common neuropil signal
 contributing to both ROI and surrounding fluorescence:
 
 \begin{align}
@@ -56,7 +62,8 @@ otherwise result in false negative transients in the corrected trace.
 The challenge of fitting this model is that the posterior distributions over
 model parameters, including the neuropil trace $z(t)$, cannot be computed
 exactly. Instead, we use the black-box stochastic variational inference (BBSVI)
-with reparametrization gradients to fit an approximate posterior distribution.
+with reparametrization gradients [@Ranganath2014;@Titsias2014;@Kucukelbir2017]
+to fit an approximate posterior distribution.
 
 The neuropil corrected fluorescence trace will then be estimated as the "noise"
 of the ASt model:
@@ -70,3 +77,5 @@ The ASt model is not limited to finding common contaminating signals in two
 traces. In principle, we could split the neuropil donut into multiple sectors
 and provide a trace for each one of them. `fit_ast_model` can also correct for
 baseline drift as a part of the neuropil estimation procedure.
+
+# References

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>model</title>
+  <title>ASt model description</title>
   <style>
       code{white-space: pre-wrap;}
       span.smallcaps{font-variant: small-caps;}
@@ -18,9 +18,11 @@
   <![endif]-->
 </head>
 <body>
-<h1 id="model-description">Model description</h1>
+<header id="title-block-header">
+<h1 class="title">ASt model description</h1>
+</header>
 <p>There are several approaches for dealing with neuropil contamination, the most common involve subtracting the surrounding neuropil fluorescence from each ROI with a scale factor determined by linear regression or hand-picked manually.</p>
-<p>We fit both ROI and surround fluorescence to asymmetric Student-t (ASt) distributions, whose mean was determined by a common neuropil signal contributing to both ROI and surrounding fluorescence:</p>
+<p>We fit both ROI and surround fluorescence to asymmetric Student-t (ASt) distributions,<span class="citation" data-cites="Zhu2010"><sup><a href="#ref-Zhu2010" role="doc-biblioref">4</a></sup></span> whose mean was determined by a common neuropil signal contributing to both ROI and surrounding fluorescence:</p>
 <p><span class="math display">\[\begin{align}
     f_r(t) &amp;\sim \mathrm{ASt}(\alpha z(t) + \mu_r, \sigma^2) \\
     f_n(t) &amp;\sim \mathrm{ASt}(z(t) + \mu_n, \sigma^2 / N) \\
@@ -31,10 +33,25 @@
 <p>The following figure represents the corresponding probabilistic graphical model, gray nodes indicating observed variables and white nodes latent variables.</p>
 <p><img src="f9420a611d0987ff66e9541d0ef5e35e0a98ed76.svg" /></p>
 <p>The advantage of this approach over other methods, lies in the use of the ASt distribution to model deviations in both ROI and surround signals. The long right tail of the ASt distribution helps prevent over-estimating the neuropil component for densely active cells. At the same time, the use of the ASt distribution for the surround signal helps account for transient increases in fluorescence arising from unannotated neurites or cell bodies, which could otherwise result in false negative transients in the corrected trace.</p>
-<p>The challenge of fitting this model is that the posterior distributions over model parameters, including the neuropil trace <span class="math inline">\(z(t)\)</span>, cannot be computed exactly. Instead, we use the black-box stochastic variational inference (BBSVI) with reparametrization gradients to fit an approximate posterior distribution.</p>
+<p>The challenge of fitting this model is that the posterior distributions over model parameters, including the neuropil trace <span class="math inline">\(z(t)\)</span>, cannot be computed exactly. Instead, we use the black-box stochastic variational inference (BBSVI) with reparametrization gradients<span class="citation" data-cites="Ranganath2014 Titsias2014 Kucukelbir2017"><sup><a href="#ref-Kucukelbir2017" role="doc-biblioref">1</a>–<a href="#ref-Titsias2014" role="doc-biblioref">3</a></sup></span> to fit an approximate posterior distribution.</p>
 <p>The neuropil corrected fluorescence trace will then be estimated as the “noise” of the ASt model:</p>
 <p><span class="math display">\[f(t) = f_r(t)- \hat{\alpha} \hat{z}(t)\]</span></p>
 <p>where <span class="math inline">\(\hat{\alpha}\)</span> and <span class="math inline">\(\hat{z}(t)\)</span> are point estimates derived from the approximate posterior distribution, e.g. its mean.</p>
 <p>The ASt model is not limited to finding common contaminating signals in two traces. In principle, we could split the neuropil donut into multiple sectors and provide a trace for each one of them. <code>fit_ast_model</code> can also correct for baseline drift as a part of the neuropil estimation procedure.</p>
+<h1 id="references" class="unnumbered">References</h1>
+<div id="refs" class="references" role="doc-bibliography">
+<div id="ref-Kucukelbir2017">
+<p>1. Kucukelbir A, Tran D, Ranganath R, Gelman A, Blei DM. Automatic differentiation variational inference. Journal of Machine Learning Research. 2017;18:14:1–14:45.</p>
+</div>
+<div id="ref-Ranganath2014">
+<p>2. Ranganath R, Gerrish S, Blei DM. Black box variational inference. In: Proceedings of the seventeenth international conference on artificial intelligence and statistics, AISTATS 2014, reykjavik, iceland, april 22-25, 2014. Vol. 33. JMLR.org; 2014. pp. 814–822. (JMLR workshop and conference proceedings).</p>
+</div>
+<div id="ref-Titsias2014">
+<p>3. Titsias MK, Yau C. Hamming ball auxiliary sampling for factorial hidden markov models. In: Ghahramani Z; Welling M; Cortes C; Lawrence ND; Weinberger KQ, editors. Advances in neural information processing systems 27: Annual conference on neural information processing systems 2014, december 8-13 2014, montreal, quebec, canada. 2014. pp. 2960–2968.</p>
+</div>
+<div id="ref-Zhu2010">
+<p>4. Zhu D, Galbraith JW. A generalized asymmetric student-t distribution with application to financial econometrics. Journal of Econometrics. 2010;157(2):297–305. doi:<a href="https://doi.org/10.1016/j.jeconom.2010.01.013">10.1016/j.jeconom.2010.01.013</a></p>
+</div>
+</div>
 </body>
 </html>
